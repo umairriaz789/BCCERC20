@@ -1,4 +1,5 @@
 pragma solidity ^0.8.0;
+import "./SafeMath.sol";
 interface IERC20 {
 
     function totalSupply() external view returns (uint256);
@@ -25,6 +26,7 @@ contract PIAICToken is IERC20{
     mapping(address => uint256) private _balances;
 //           owner             spender    allowance
     mapping(address => mapping(address => uint256)) private _allowances;
+    mapping(address => uint256) private _enabelTransfer;
 
     uint256 private _totalSupply;
     address public owner;
@@ -35,6 +37,8 @@ contract PIAICToken is IERC20{
     uint256 private Price;
     uint256 private Send_token;
     address private ETH_Sender;
+    uint public cap;
+    using SafeMath for uint;
 
     
     constructor() public payable {
@@ -44,7 +48,8 @@ contract PIAICToken is IERC20{
         ETH_Sender=msg.sender;
         Price= 0.01 ether;
         owner= msg.sender;
-        _totalSupply=10 ether;
+        _totalSupply= 1000000*10**decimals;
+        cap =_totalSupply.mul(2);
         _balances[owner]=_totalSupply;
         emit Transfer(address(this),owner,_totalSupply);
     }
@@ -96,24 +101,31 @@ contract PIAICToken is IERC20{
  
     function mint(uint256 qty) public  returns(uint256){
         require(msg.sender== owner,"only admin can run this function");
+        require (qty>0,"Invalid amount");
+        require (totalSupply().add( qty)<cap,"Overlisted Token");
         _totalSupply += qty;
         _balances[owner] +=qty;
         return _totalSupply;
     }
-    fallback() external payable{
-    }
-    receive() external payable{
+    function _transfer(address sender,address recipient,uint256 amount) public virtual {
+        require(sender != address(0), "ERC20: transfer from the zero address");
+        require(recipient != address(0), "ERC20: transfer to the zero address");
+        require(block.timestamp >= _enabelTransfer[msg.sender], "Not allowed to transfer");
+
         
+
+        uint256 senderBalance = _balances[sender];
+        require(senderBalance >= amount, "ERC20: transfer amount exceeds balance");
+        unchecked {
+            _balances[sender] = senderBalance - amount;
+        }
+        _balances[recipient] += amount;
+
+        emit Transfer(sender, recipient, amount);
+
     }
-    function ether_Send () public payable {
-        uint256 Recive_ETH = msg.value;
-        payable(owner).transfer( Recive_ETH);
-        _totalSupply += ( Recive_ETH);
-        require( Recive_ETH > 0,"you need to send some ether");
-        Send_token =  Recive_ETH/ Price;
-        _balances[msg.sender] += Send_token;
-        _totalSupply -=(Send_token);
-    }
+    
+
     
 }
 
